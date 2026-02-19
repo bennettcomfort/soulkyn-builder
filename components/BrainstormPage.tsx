@@ -92,7 +92,7 @@ export function BrainstormPage() {
           if (data === '[DONE]') break
           try {
             const parsed = JSON.parse(data)
-            if (parsed.text) {
+            if (parsed.text && !parsed.thinking) {
               accumulated += parsed.text
               setMessages((prev) =>
                 prev.map((m) =>

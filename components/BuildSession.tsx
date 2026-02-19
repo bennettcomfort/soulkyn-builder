@@ -122,7 +122,7 @@ export function BuildSession({ sessionId }: BuildSessionProps) {
           try {
             const parsed = JSON.parse(data)
             if (parsed.error) throw new Error(parsed.error)
-            if (parsed.text) {
+            if (parsed.text && !parsed.thinking) {
               accumulated += parsed.text
               setDraftContent(accumulated)
             }

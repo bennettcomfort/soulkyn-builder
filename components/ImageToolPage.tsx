@@ -86,6 +86,7 @@ export function ImageToolPage() {
   const [limit, setLimit] = useState<550 | 1000>(550)
   const [output, setOutput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isThinking, setIsThinking] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -130,6 +131,7 @@ export function ImageToolPage() {
   const generate = useCallback(async () => {
     if (!description.trim() && !imageFile) return
     setIsGenerating(true)
+    setIsThinking(false)
     setOutput('')
     setGenError(null)
 
@@ -160,7 +162,6 @@ Requirements:
         body: JSON.stringify({
           messages: [{ role: 'user', content: userContent }],
           systemPrompt: IMAGE_SYSTEM_PROMPT,
-          maxTokens: 1024,
         }),
       })
 
@@ -193,7 +194,10 @@ Requirements:
           try {
             const parsed = JSON.parse(data)
             if (parsed.error) throw new Error(parsed.error)
-            if (parsed.text) {
+            if (parsed.thinking) {
+              setIsThinking(true)
+            } else if (parsed.text) {
+              setIsThinking(false)
               accumulated += parsed.text
               setOutput(accumulated)
             }
@@ -212,6 +216,7 @@ Requirements:
       setGenError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsGenerating(false)
+      setIsThinking(false)
     }
   }, [description, imageFile, imagePreview, model, limit])
 
@@ -411,6 +416,13 @@ Requirements:
                   )}
                   style={{ width: `${charPercent}%` }}
                 />
+              </div>
+            )}
+
+            {isThinking && (
+              <div className="mb-3 flex items-center gap-2 text-xs text-slate-500">
+                <span className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                Reasoning...
               </div>
             )}
 

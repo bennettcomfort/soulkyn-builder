@@ -30,9 +30,15 @@ export async function streamOpenAICompatResponse(
     async start(controller) {
       try {
         for await (const chunk of stream) {
-          const delta = chunk.choices[0]?.delta?.content
-          if (delta) {
-            controller.enqueue(delta)
+          const delta = chunk.choices[0]?.delta as Record<string, string | undefined>
+          const reasoning = delta?.reasoning
+          const content = delta?.content
+          // Prefix reasoning tokens with \x01 so the route can tag them as thinking:true
+          if (reasoning) {
+            controller.enqueue('\x01' + reasoning)
+          }
+          if (content) {
+            controller.enqueue(content)
           }
         }
         controller.close()

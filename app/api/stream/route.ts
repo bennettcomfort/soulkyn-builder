@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const stream = await streamResponse(messages, systemPrompt, {
-      maxTokens: body.maxTokens || 4096,
+      maxTokens: body.maxTokens || 8192,
       enableWebSearch: body.enableWebSearch,
     })
 
@@ -53,8 +53,12 @@ export async function POST(req: NextRequest) {
               controller.close()
               break
             }
-            // SSE format
-            const chunk = JSON.stringify({ text: value })
+            // SSE format — \x01 prefix marks reasoning/thinking tokens
+            const isThinking = value.startsWith('\x01')
+            const text = isThinking ? value.slice(1) : value
+            const chunk = isThinking
+              ? JSON.stringify({ text, thinking: true })
+              : JSON.stringify({ text })
             controller.enqueue(encoder.encode(`data: ${chunk}\n\n`))
           }
         } catch (err) {
