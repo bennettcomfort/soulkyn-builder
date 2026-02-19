@@ -17,7 +17,7 @@ export default function RootLayout({
       <body className="bg-[#0d0f1a] text-slate-200 min-h-screen antialiased">
         <div className="flex min-h-screen">
           <Navigation />
-          <main className="flex-1 ml-16 min-h-screen">
+          <main className="flex-1 ml-20 min-h-screen">
             {children}
           </main>
         </div>

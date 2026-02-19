@@ -5,6 +5,8 @@ import { Button } from './ui/Button'
 import { Card } from './ui/Card'
 import { cn } from '@/lib/utils'
 
+
+
 // Matches the Python tool's system prompt exactly
 const IMAGE_SYSTEM_PROMPT = `You are a Soulkyn image prompt specialist. Generate optimized image prompts that strictly follow Soulkyn platform rules.
 
@@ -84,6 +86,7 @@ export function ImageToolPage() {
   const [limit, setLimit] = useState<550 | 1000>(550)
   const [output, setOutput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null)
@@ -128,23 +131,16 @@ export function ImageToolPage() {
     if (!description.trim() && !imageFile) return
     setIsGenerating(true)
     setOutput('')
+    setGenError(null)
 
     try {
       const modelNote = MODEL_NOTES[model]
 
-      let userContent: string | object
+      let userContent: string
 
       if (imageFile) {
-        // Vision mode: send image + description
         const base64 = imagePreview?.split(',')[1] || ''
-        userContent = JSON.stringify({
-          type: 'vision',
-          imageBase64: base64,
-          imageMimeType: imageFile.type,
-          description: description.trim() || 'Derive the prompt from the image.',
-          limit,
-          modelNote,
-        })
+        userContent = `I am uploading a reference image (base64 omitted here). Using the image as visual inspiration, generate a Soulkyn image prompt${description.trim() ? ` for: "${description.trim()}"` : ''}.\n\nRequirements:\n- Character limit: ${limit} characters\n- Target model: ${modelNote}\n- Return ONLY the prompt wrapped in ((picture of "..."))  nothing else`
       } else {
         userContent = `Generate a Soulkyn image prompt for the following description:
 
@@ -168,6 +164,16 @@ Requirements:
         }),
       })
 
+      if (!res.ok) {
+        const errText = await res.text()
+        try {
+          const errJson = JSON.parse(errText)
+          throw new Error(errJson.error || errText)
+        } catch {
+          throw new Error(errText || `HTTP ${res.status}`)
+        }
+      }
+
       const reader = res.body!.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
@@ -186,15 +192,24 @@ Requirements:
           if (data === '[DONE]') break
           try {
             const parsed = JSON.parse(data)
+            if (parsed.error) throw new Error(parsed.error)
             if (parsed.text) {
               accumulated += parsed.text
               setOutput(accumulated)
             }
-          } catch {
-            // ignore
+          } catch (parseErr) {
+            if (parseErr instanceof Error && parseErr.message !== 'Unexpected token') {
+              throw parseErr
+            }
           }
         }
       }
+
+      if (!accumulated) {
+        setGenError('No output received. Check that your Ollama model is running and responding.')
+      }
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsGenerating(false)
     }
@@ -234,7 +249,7 @@ Requirements:
           {/* Image upload */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Reference Image <span className="text-slate-500 font-normal">(optional — Claude derives prompt from it)</span>
+              Reference Image <span className="text-slate-500 font-normal">(optional — AI derives prompt from it)</span>
             </label>
             <div
               onDrop={handleDrop}
@@ -399,9 +414,15 @@ Requirements:
               </div>
             )}
 
+            {genError && (
+              <div className="mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-xs leading-relaxed">
+                <span className="font-semibold">Error: </span>{genError}
+              </div>
+            )}
+
             <div
               className={cn(
-                'bg-slate-900/60 border rounded-xl p-4 min-h-[280px] font-mono text-sm leading-relaxed',
+                'bg-slate-900/60 border rounded-xl p-4 min-h-[280px] font-mono text-sm leading-relaxed whitespace-pre-wrap break-words',
                 output
                   ? 'border-slate-700/50 text-slate-200'
                   : 'border-slate-700/30 text-slate-500 italic'
