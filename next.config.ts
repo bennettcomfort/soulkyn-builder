@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: ['@anthropic-ai/sdk', 'openai', 'fs', 'path'],
 };
 
 export default nextConfig;
