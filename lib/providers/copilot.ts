@@ -44,7 +44,13 @@ export async function streamCopilotResponse(
   githubToken: string,
   model: string
 ): Promise<ReadableStream<string>> {
-  const sessionToken = await getCopilotSessionToken(githubToken)
+  // Try token directly first; fall back to exchange if needed
+  let sessionToken: string
+  try {
+    sessionToken = await getCopilotSessionToken(githubToken)
+  } catch {
+    sessionToken = githubToken
+  }
 
   const client = new OpenAI({
     baseURL: 'https://api.githubcopilot.com',
@@ -86,16 +92,11 @@ export async function streamCopilotResponse(
   })
 }
 
-export async function copilotCompletion(
-  prefix: string,
-  githubToken: string
-): Promise<string> {
-  const sessionToken = await getCopilotSessionToken(githubToken)
-
+async function callCopilotChat(token: string, prefix: string): Promise<string | null> {
   const res = await fetch('https://api.githubcopilot.com/chat/completions', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${sessionToken}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       'Copilot-Integration-Id': 'vscode-chat',
       'Editor-Version': 'vscode/1.85.0',
@@ -119,9 +120,23 @@ export async function copilotCompletion(
     }),
   })
 
-  if (!res.ok) return ''
+  if (!res.ok) return null
 
   const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
   const raw = data.choices?.[0]?.message?.content ?? ''
-  return raw.replace(/^["'\s]+|["'\s]+$/g, '').trim()
+  return raw.replace(/^["'\s]+|["'\s]+$/g, '').trim() || null
+}
+
+export async function copilotCompletion(
+  prefix: string,
+  githubToken: string
+): Promise<string> {
+  // Try the token directly first (works for GitHub App user tokens from apps.json)
+  const direct = await callCopilotChat(githubToken, prefix)
+  if (direct !== null) return direct
+
+  // Fall back to session token exchange (for OAuth tokens with copilot scope)
+  const sessionToken = await getCopilotSessionToken(githubToken)
+  const exchanged = await callCopilotChat(sessionToken, prefix)
+  return exchanged ?? ''
 }

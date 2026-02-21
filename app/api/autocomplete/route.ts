@@ -14,12 +14,14 @@ export async function POST(req: NextRequest) {
     const githubToken = settings.copilotToken
 
     if (!githubToken) {
-      return NextResponse.json({ suggestion: '' })
+      return NextResponse.json({ suggestion: '', debug: 'no copilotToken in settings' })
     }
 
     const suggestion = await copilotCompletion(prefix, githubToken)
     return NextResponse.json({ suggestion })
-  } catch {
-    return NextResponse.json({ suggestion: '' })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[autocomplete]', msg)
+    return NextResponse.json({ suggestion: '', debug: msg })
   }
 }

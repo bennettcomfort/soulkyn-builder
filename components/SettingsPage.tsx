@@ -99,7 +99,9 @@ export function SettingsPage() {
   const fetchModels = useCallback(async () => {
     setFetchingModels(true)
     try {
-      const res = await fetch('/api/models')
+      const params = new URLSearchParams({ baseUrl })
+      if (apiKey) params.set('apiKey', apiKey)
+      const res = await fetch(`/api/models?${params}`)
       const data = await res.json()
       setModels(data.models || [])
     } catch {
@@ -107,7 +109,7 @@ export function SettingsPage() {
     } finally {
       setFetchingModels(false)
     }
-  }, [])
+  }, [baseUrl, apiKey])
 
   const handleProviderChange = (p: ProviderType) => {
     setProvider(p)
