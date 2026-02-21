@@ -2,6 +2,7 @@ import { loadSettings } from './settings'
 import { streamAnthropicResponse, listAnthropicModels } from './providers/anthropic'
 import { streamOpenAICompatResponse, listOpenAICompatModels } from './providers/openai-compat'
 import { streamOllamaResponse } from './providers/ollama-native'
+import { streamCopilotResponse } from './providers/copilot'
 
 export type AIContentPart =
   | { type: 'text'; text: string }
@@ -62,7 +63,17 @@ export async function streamResponse(
     )
   }
 
-  // All other OpenAI-compat providers (lmstudio, openai, copilot, custom)
+  if (settings.provider === 'copilot') {
+    return streamCopilotResponse(
+      messages,
+      systemPrompt,
+      options,
+      settings.apiKey,
+      settings.model
+    )
+  }
+
+  // All other OpenAI-compat providers (lmstudio, openai, custom)
   return streamOpenAICompatResponse(
     messages,
     systemPrompt,
