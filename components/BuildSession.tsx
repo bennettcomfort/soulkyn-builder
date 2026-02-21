@@ -65,6 +65,7 @@ import type { Session } from '@/lib/sessions'
 import type { TagSets } from '@/lib/tag-sets'
 import { DEFAULT_TAG_SETS } from '@/lib/tag-sets'
 import type { ContentType } from '@/lib/budget'
+import { generateExportMarkdown, exportFilename } from '@/lib/export'
 
 type BuildPhase = 'interview' | 'generating' | 'review' | 'complete'
 type SectionAction = 'expand' | 'compress' | 'continue'
@@ -379,6 +380,24 @@ ${items.map((item, i) => `${i + 1}. ${item}`).join('\n')}
     })
     setPhase('complete')
   }, [session, draftContent, saveSession])
+
+  const handleExport = useCallback(() => {
+    if (!session) return
+    const md = generateExportMarkdown({
+      name: session.name,
+      draftContent,
+      finalContent: session.finalContent ?? null,
+      tagSets,
+      chatExamples,
+    })
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = exportFilename(session.name)
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [session, draftContent, tagSets, chatExamples])
 
   const handleStopStream = () => {
     abortRef.current?.abort()
@@ -717,7 +736,7 @@ No preamble, no commentary — output only the section block starting with [Impo
                   Saved to{' '}
                   <code className="text-violet-300 text-xs">Projects/{session.name}/final.md</code>
                 </p>
-                <div className="flex gap-2 justify-center">
+                <div className="flex gap-2 justify-center flex-wrap">
                   <Button
                     variant="outline"
                     size="sm"
@@ -730,11 +749,16 @@ No preamble, no commentary — output only the section block starting with [Impo
                   </Button>
                   <Button
                     size="sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(draftContent)
-                    }}
+                    onClick={() => navigator.clipboard.writeText(draftContent)}
+                    variant="secondary"
                   >
                     Copy Output
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleExport}
+                  >
+                    Export .md
                   </Button>
                 </div>
               </div>
@@ -763,12 +787,20 @@ No preamble, no commentary — output only the section block starting with [Impo
               </span>
               <div className="flex items-center gap-3">
                 {draftContent && (
-                  <button
-                    onClick={() => navigator.clipboard.writeText(draftContent)}
-                    className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    Copy
-                  </button>
+                  <>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(draftContent)}
+                      className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                    >
+                      Copy
+                    </button>
+                    <button
+                      onClick={handleExport}
+                      className="text-xs text-amber-500/70 hover:text-amber-300 transition-colors"
+                    >
+                      Export .md
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={() => setGuideOpen((o) => !o)}

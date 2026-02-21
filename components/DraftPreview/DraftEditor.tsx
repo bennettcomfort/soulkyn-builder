@@ -100,6 +100,7 @@ const CHAT_EXAMPLE_LIMIT = 800
 
 function TagSetField({ def, value, onChange }: { def: TagSetDef; value: string; onChange: (v: string) => void }) {
   const [inputVal, setInputVal] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const tags = value.split(',').map((t) => t.trim()).filter(Boolean)
   const count = tags.length
@@ -195,6 +196,25 @@ function TagSetField({ def, value, onChange }: { def: TagSetDef; value: string; 
           count > TAG_LIMIT ? 'border-red-500/60 focus:border-red-400' : cn('border-[#5a5a5a]', def.inputFocus)
         )}
       />
+
+      {/* Copy to clipboard */}
+      {tags.length > 0 && (
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(tags.join(', '))
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+          }}
+          className={cn(
+            'w-full text-xs py-1 rounded-lg border transition-colors',
+            copied
+              ? cn('border-green-500/30 bg-green-500/10 text-green-400')
+              : cn('border-[#5a5a5a] text-[#888] hover:text-[#cccccc] hover:border-slate-500')
+          )}
+        >
+          {copied ? '✓ Copied!' : 'Copy to clipboard'}
+        </button>
+      )}
     </div>
   )
 }

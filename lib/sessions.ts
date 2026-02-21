@@ -7,6 +7,7 @@ export type { TagSets } from './tag-sets'
 export { DEFAULT_TAG_SETS } from './tag-sets'
 import { DEFAULT_TAG_SETS } from './tag-sets'
 import type { TagSets } from './tag-sets'
+import { generateExportMarkdown, exportFilename } from './export'
 
 export type SessionStatus = 'in_progress' | 'complete' | 'draft'
 export type BuildMode = 'interview' | 'freeform' | 'roughdraft' | 'chat'
@@ -129,6 +130,13 @@ export function writeFinalOutput(session: Session): void {
   if (!fs.existsSync(projectsDir)) {
     fs.mkdirSync(projectsDir, { recursive: true })
   }
-  const finalPath = path.join(projectsDir, 'final.md')
-  fs.writeFileSync(finalPath, session.finalContent || session.draftContent)
+  const markdown = generateExportMarkdown({
+    name: session.name,
+    draftContent: session.draftContent,
+    finalContent: session.finalContent,
+    tagSets: session.tagSets,
+    chatExamples: session.chatExamples,
+  })
+  const finalPath = path.join(projectsDir, exportFilename(session.name))
+  fs.writeFileSync(finalPath, markdown)
 }
