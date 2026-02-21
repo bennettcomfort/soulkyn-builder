@@ -79,6 +79,8 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [copilotToken, setCopilotToken] = useState('')
+  const [detectingCopilot, setDetectingCopilot] = useState(false)
+  const [detectResult, setDetectResult] = useState<string | null>(null)
 
   // Load current settings
   useEffect(() => {
@@ -328,20 +330,54 @@ export function SettingsPage() {
         </h2>
         <p className="text-xs text-slate-500 mb-3">
           Ghost-text completions in the draft editor. Always uses GitHub Copilot regardless of main provider.
-          Get your token by running <code className="text-amber-400 bg-slate-800 px-1 rounded">gh auth token</code> in your terminal.
+          Requires a token from the Copilot CLI or VS Code Copilot extension (not a regular PAT).
         </p>
-        <Card className="p-5">
+        <Card className="p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">GitHub OAuth Token</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-sm font-medium text-slate-300">GitHub Copilot Token</label>
+              <button
+                onClick={async () => {
+                  setDetectingCopilot(true)
+                  setDetectResult(null)
+                  try {
+                    const res = await fetch('/api/detect-copilot-token')
+                    const data = await res.json() as { token: string | null; source: string | null }
+                    if (data.token) {
+                      setCopilotToken(data.token)
+                      setDetectResult(`✓ Found in ${data.source}`)
+                    } else {
+                      setDetectResult('Not found — see instructions below')
+                    }
+                  } catch {
+                    setDetectResult('Detection failed')
+                  } finally {
+                    setDetectingCopilot(false)
+                  }
+                }}
+                disabled={detectingCopilot}
+                className="text-xs text-violet-400 hover:text-amber-300 transition-colors disabled:opacity-50"
+              >
+                {detectingCopilot ? 'Detecting…' : '⟳ Auto-detect'}
+              </button>
+            </div>
             <input
               type="password"
               value={copilotToken}
               onChange={(e) => setCopilotToken(e.target.value)}
-              placeholder="gho_... (run: gh auth token)"
+              placeholder="ghu_... (auto-detect or paste manually)"
               className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500 font-mono placeholder-slate-600"
             />
-            <p className="text-xs text-slate-500 mt-1">
-              Stored locally in data/settings.json. Leave blank to disable autocomplete.
+            {detectResult && (
+              <p className={cn('text-xs mt-1', detectResult.startsWith('✓') ? 'text-green-400' : 'text-amber-400')}>
+                {detectResult}
+              </p>
+            )}
+            <p className="text-xs text-slate-500 mt-2">
+              Auto-detect reads from <code className="text-slate-400">~/.config/github-copilot/apps.json</code>.
+              To populate that file, install the{' '}
+              <code className="text-amber-400 bg-slate-800 px-1 rounded">gh copilot</code> extension:
+              {' '}<code className="text-slate-400 bg-slate-800 px-1 rounded">gh extension install github/gh-copilot</code>
             </p>
           </div>
         </Card>
