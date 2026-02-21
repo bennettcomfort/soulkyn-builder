@@ -20,7 +20,7 @@ export function Button({
       className={cn(
         'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed',
         {
-          'bg-violet-600 hover:bg-violet-500 text-white focus:ring-violet-500 shadow-lg shadow-violet-500/20':
+          'bg-amber-600 hover:bg-amber-500 text-white focus:ring-amber-500 shadow-lg shadow-amber-500/20':
             variant === 'primary',
           'bg-slate-700 hover:bg-slate-600 text-slate-100 focus:ring-slate-500':
             variant === 'secondary',

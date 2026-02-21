@@ -9,10 +9,10 @@ export interface BudgetInfo {
 }
 
 export const TYPE_LIMITS = {
-  RPG: { background: 6850, chatExample: 700, chatExampleCount: 4 },
-  SC: { total: 6800, chatExample: 700, chatExampleCount: 4 },
-  DLL: { total: 6800, chatExample: 700, chatExampleCount: 4 },
-  WRL: { intro: 800, lore: 6000, total: 6800, chatExample: 700, chatExampleCount: 4 },
+  RPG: { background: 7000, chatExample: 700, chatExampleCount: 4 },
+  SC: { total: 7000, chatExample: 700, chatExampleCount: 4 },
+  DLL: { total: 7000, chatExample: 700, chatExampleCount: 4 },
+  WRL: { intro: 800, lore: 6000, total: 7000, chatExample: 700, chatExampleCount: 4 },
 } as const
 
 export type ContentType = keyof typeof TYPE_LIMITS
@@ -57,7 +57,7 @@ export function getTotalLimit(type: ContentType): number {
   const limits = TYPE_LIMITS[type]
   if ('total' in limits) return limits.total
   if ('background' in limits) return limits.background
-  return 6850
+  return 7000
 }
 
 export function countChars(text: string): number {

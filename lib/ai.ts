@@ -1,15 +1,22 @@
 import { loadSettings } from './settings'
 import { streamAnthropicResponse, listAnthropicModels } from './providers/anthropic'
 import { streamOpenAICompatResponse, listOpenAICompatModels } from './providers/openai-compat'
+import { streamOllamaResponse } from './providers/ollama-native'
+
+export type AIContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
 
 export interface AIMessage {
   role: 'user' | 'assistant'
-  content: string
+  content: string | AIContentPart[]
 }
 
 export interface AIStreamOptions {
   maxTokens?: number
   enableWebSearch?: boolean
+  /** Set to false to disable chain-of-thought/thinking for models that support it (e.g. Ollama think: false) */
+  thinkingEnabled?: boolean
 }
 
 export interface ProviderCapabilities {
@@ -44,7 +51,18 @@ export async function streamResponse(
     )
   }
 
-  // All local/OpenAI-compat providers
+  // Use native Ollama API so `think: false` and proper streaming work correctly
+  if (settings.provider === 'ollama') {
+    return streamOllamaResponse(
+      messages,
+      systemPrompt,
+      options,
+      settings.baseUrl,
+      settings.model
+    )
+  }
+
+  // All other OpenAI-compat providers (lmstudio, openai, custom)
   return streamOpenAICompatResponse(
     messages,
     systemPrompt,

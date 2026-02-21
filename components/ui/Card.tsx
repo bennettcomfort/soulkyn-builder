@@ -10,7 +10,7 @@ export function Card({ glow, className, children, ...props }: CardProps) {
     <div
       className={cn(
         'bg-slate-800/60 border border-slate-700/50 rounded-xl backdrop-blur-sm',
-        glow && 'shadow-lg shadow-violet-500/10',
+        glow && 'shadow-lg shadow-amber-500/10',
         className
       )}
       {...props}

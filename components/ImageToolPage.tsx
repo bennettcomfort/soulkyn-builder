@@ -10,9 +10,13 @@ import { cn } from '@/lib/utils'
 // Matches the Python tool's system prompt exactly
 const IMAGE_SYSTEM_PROMPT = `You are a Soulkyn image prompt specialist. Generate optimized image prompts that strictly follow Soulkyn platform rules.
 
+## CRITICAL RULES
+1. The user will specify a HARD character limit. You MUST stay within it — count every character before responding.
+2. If your draft is too long, remove the least important keywords until it fits. Never exceed the limit.
+3. Return ONLY the raw prompt keywords — no wrapper, no explanation, no preamble, no character count.
+
 ## OUTPUT FORMAT
-Always wrap the entire prompt in: ((picture of "content"))
-Return ONLY the prompt — no explanation, no preamble, no character count.
+Return only the comma-separated keyword prompt directly — no ((picture of "...")) wrapper, no quotes, no extra text.
 
 ## SYNTAX RULES
 - Use SPACES between words: (long black hair) ✓  NOT (long_black_hair) ✗
@@ -80,6 +84,47 @@ interface CacheStatus {
   sizeMb?: number
 }
 
+async function readSSEStream(
+  res: Response,
+  onText: (text: string) => void,
+  onThinking?: (thinking: boolean) => void,
+): Promise<string> {
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let accumulated = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const data = line.slice(6)
+      if (data === '[DONE]') break
+      try {
+        const parsed = JSON.parse(data)
+        if (parsed.error) throw new Error(parsed.error)
+        if (parsed.thinking) {
+          onThinking?.(true)
+        } else if (parsed.text) {
+          onThinking?.(false)
+          accumulated += parsed.text
+          onText(accumulated)
+        }
+      } catch (parseErr) {
+        if (parseErr instanceof Error && parseErr.message !== 'Unexpected token') {
+          throw parseErr
+        }
+      }
+    }
+  }
+  return accumulated
+}
+
 export function ImageToolPage() {
   const [description, setDescription] = useState('')
   const [model, setModel] = useState<ModelKey>('anime')
@@ -87,6 +132,7 @@ export function ImageToolPage() {
   const [output, setOutput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isThinking, setIsThinking] = useState(false)
+  const [isTrimming, setIsTrimming] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -128,97 +174,121 @@ export function ImageToolPage() {
     }
   }
 
+  const streamRequest = useCallback(async (
+    userContent: string,
+    maxTokens: number,
+    onText: (t: string) => void,
+    onThinking: (t: boolean) => void,
+    imageDataUrl?: string,
+  ): Promise<string> => {
+    const content = imageDataUrl
+      ? [
+          { type: 'image_url' as const, image_url: { url: imageDataUrl } },
+          { type: 'text' as const, text: userContent },
+        ]
+      : userContent
+
+    const res = await fetch('/api/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content }],
+        systemPrompt: IMAGE_SYSTEM_PROMPT,
+        maxTokens,
+        thinkingEnabled: false,
+      }),
+    })
+    if (!res.ok) {
+      const errText = await res.text()
+      try {
+        const errJson = JSON.parse(errText)
+        throw new Error(errJson.error || errText)
+      } catch {
+        throw new Error(errText || `HTTP ${res.status}`)
+      }
+    }
+    return readSSEStream(res, onText, onThinking)
+  }, [])
+
   const generate = useCallback(async () => {
     if (!description.trim() && !imageFile) return
     setIsGenerating(true)
     setIsThinking(false)
+    setIsTrimming(false)
     setOutput('')
     setGenError(null)
 
     try {
       const modelNote = MODEL_NOTES[model]
+      // Vision/reasoning models (e.g. qwen3-vl) can spend thousands of tokens on internal
+      // reasoning. Use 8192 for image requests so thinking finishes and content is produced.
+      const maxTokens = imageFile ? 8192 : limit === 550 ? 1200 : 1800
 
       let userContent: string
-
       if (imageFile) {
-        const base64 = imagePreview?.split(',')[1] || ''
-        userContent = `I am uploading a reference image (base64 omitted here). Using the image as visual inspiration, generate a Soulkyn image prompt${description.trim() ? ` for: "${description.trim()}"` : ''}.\n\nRequirements:\n- Character limit: ${limit} characters\n- Target model: ${modelNote}\n- Return ONLY the prompt wrapped in ((picture of "..."))  nothing else`
+        userContent = `Using the image as visual inspiration, generate a Soulkyn image prompt${description.trim() ? ` for: "${description.trim()}"` : ''}.
+
+STRICT REQUIREMENTS:
+- HARD character limit: ${limit} characters — count every character of the raw keyword output
+- If your draft exceeds ${limit} characters, trim keywords until it fits
+- Target model: ${modelNote}
+- Return ONLY the raw keywords, no wrapper, nothing else`
       } else {
         userContent = `Generate a Soulkyn image prompt for the following description:
 
 "${description}"
 
-Requirements:
-- Character limit: ${limit} characters (count the entire ((picture of "...")) wrapper)
+STRICT REQUIREMENTS:
+- HARD character limit: ${limit} characters — count every character of the raw keyword output
+- If your draft exceeds ${limit} characters, remove the least important keywords until it fits
 - Target model: ${modelNote}
-- Include appropriate negative prompts at the end
+- Include negative prompts at the end
 - Follow the build order strictly
-- Return ONLY the prompt, nothing else`
+- Return ONLY the raw keywords, no wrapper, nothing else`
       }
 
-      const res = await fetch('/api/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: userContent }],
-          systemPrompt: IMAGE_SYSTEM_PROMPT,
-        }),
-      })
-
-      if (!res.ok) {
-        const errText = await res.text()
-        try {
-          const errJson = JSON.parse(errText)
-          throw new Error(errJson.error || errText)
-        } catch {
-          throw new Error(errText || `HTTP ${res.status}`)
-        }
-      }
-
-      const reader = res.body!.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let accumulated = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const data = line.slice(6)
-          if (data === '[DONE]') break
-          try {
-            const parsed = JSON.parse(data)
-            if (parsed.error) throw new Error(parsed.error)
-            if (parsed.thinking) {
-              setIsThinking(true)
-            } else if (parsed.text) {
-              setIsThinking(false)
-              accumulated += parsed.text
-              setOutput(accumulated)
-            }
-          } catch (parseErr) {
-            if (parseErr instanceof Error && parseErr.message !== 'Unexpected token') {
-              throw parseErr
-            }
-          }
-        }
-      }
+      let accumulated = await streamRequest(
+        userContent,
+        maxTokens,
+        setOutput,
+        setIsThinking,
+        imageFile ? (imagePreview ?? undefined) : undefined,
+      )
 
       if (!accumulated) {
-        setGenError('No output received. Check that your Ollama model is running and responding.')
+        setGenError(
+          imageFile
+            ? 'No output received. Make sure your model supports vision (e.g. qwen2.5vl, llava). Check the server console for the actual error.'
+            : 'No output received. Check that your Ollama model is running and responding.'
+        )
+        return
       }
+
+      // Up to 2 trim passes — LLMs often overshoot on the first correction
+      for (let pass = 0; pass < 2; pass++) {
+        if (accumulated.length <= limit) break
+        setIsThinking(false)
+        setIsTrimming(true)
+        const overage = accumulated.length - limit
+        const trimContent = `This image prompt is ${accumulated.length} characters — ${overage} over the ${limit} character limit:
+
+${accumulated}
+
+Remove the least important positive keywords until the total length is ≤ ${limit} characters. Keep all negative prompts. Return ONLY the trimmed keywords, no wrapper, nothing else.`
+
+        const trimmed = await streamRequest(trimContent, maxTokens, setOutput, () => {})
+        if (trimmed) accumulated = trimmed
+      }
+
+      setOutput(accumulated)
     } catch (err) {
       setGenError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsGenerating(false)
       setIsThinking(false)
+      setIsTrimming(false)
     }
-  }, [description, imageFile, imagePreview, model, limit])
+  }, [description, imageFile, imagePreview, model, limit, streamRequest])
 
   const charCount = output.length
   const isWithinLimit = charCount <= limit
@@ -425,6 +495,12 @@ Requirements:
                 Reasoning...
               </div>
             )}
+            {isTrimming && (
+              <div className="mb-3 flex items-center gap-2 text-xs text-amber-500/80">
+                <span className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                Over limit — trimming to fit...
+              </div>
+            )}
 
             {genError && (
               <div className="mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-xs leading-relaxed">
@@ -485,7 +561,7 @@ Requirements:
             <div className="text-xs text-slate-500 space-y-1">
               <p><span className="text-slate-300">(keyword)+++</span> = strong emphasis (1.33)</p>
               <p><span className="text-slate-300">(keyword):2</span> = precise weight (max for anime)</p>
-              <p><span className="text-slate-300">((picture of "...")) </span>= required wrapper</p>
+              <p><span className="text-slate-300">(keyword)---</span> = negative prompt</p>
               <p className="text-yellow-500/80">Never use underscores — always spaces</p>
             </div>
           </Card>

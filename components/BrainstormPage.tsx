@@ -71,6 +71,7 @@ export function BrainstormPage() {
           ],
           systemPrompt: BRAINSTORM_SYSTEM,
           maxTokens: 2048,
+          thinkingEnabled: false,
         }),
       })
 

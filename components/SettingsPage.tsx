@@ -12,6 +12,7 @@ const PROVIDER_LABELS: Record<ProviderType, string> = {
   ollama: 'Ollama (local)',
   lmstudio: 'LM Studio (local)',
   openai: 'OpenAI',
+  xai: 'xAI (Grok)',
   custom: 'Custom OpenAI-compatible',
 }
 
@@ -36,6 +37,11 @@ const PROVIDER_DEFAULTS: Record<ProviderType, { baseUrl: string; placeholder: st
     placeholder: 'sk-...',
     needsKey: true,
   },
+  xai: {
+    baseUrl: 'https://api.x.ai/v1',
+    placeholder: 'xai-...',
+    needsKey: true,
+  },
   custom: {
     baseUrl: 'http://localhost:8080/v1',
     placeholder: 'API key (if required)',
@@ -48,6 +54,7 @@ const PROVIDER_CAPABILITIES: Record<ProviderType, string[]> = {
   ollama: ['Streaming', 'Tools (model-dependent)'],
   lmstudio: ['Streaming', 'Tools (model-dependent)'],
   openai: ['Vision (GPT-4o)', 'Tools', 'Streaming'],
+  xai: ['Streaming', 'Tools', 'Vision (grok-2-vision)'],
   custom: ['Streaming', 'Tools (provider-dependent)'],
 }
 
@@ -156,12 +163,12 @@ export function SettingsPage() {
               className={cn(
                 'w-full text-left p-4 rounded-xl border transition-all',
                 provider === p
-                  ? 'border-violet-500/50 bg-violet-500/10'
+                  ? 'border-amber-500/50 bg-amber-500/10'
                   : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600/50'
               )}
             >
               <div className="flex items-center justify-between">
-                <span className={cn('font-medium', provider === p ? 'text-violet-300' : 'text-slate-200')}>
+                <span className={cn('font-medium', provider === p ? 'text-amber-300' : 'text-slate-200')}>
                   {PROVIDER_LABELS[p]}
                 </span>
                 <div className="flex gap-1 flex-wrap">
@@ -192,7 +199,7 @@ export function SettingsPage() {
               type="text"
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-violet-500 font-mono"
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500 font-mono"
             />
           </div>
 
@@ -206,7 +213,7 @@ export function SettingsPage() {
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder={PROVIDER_DEFAULTS[provider].placeholder}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-violet-500 font-mono placeholder-slate-600"
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500 font-mono placeholder-slate-600"
               />
               <p className="text-xs text-slate-500 mt-1">
                 Stored locally in data/settings.json
@@ -218,11 +225,11 @@ export function SettingsPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-sm font-medium text-slate-300">Model</label>
-              {provider !== 'anthropic' && (
+              {provider !== 'anthropic' && provider !== 'xai' && (
                 <button
                   onClick={fetchModels}
                   disabled={fetchingModels}
-                  className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                  className="text-xs text-violet-400 hover:text-amber-300 transition-colors"
                 >
                   {fetchingModels ? 'Fetching...' : '↻ Fetch from server'}
                 </button>
@@ -238,7 +245,24 @@ export function SettingsPage() {
                     className={cn(
                       'text-left px-3 py-2 rounded-lg border text-sm font-mono transition-all',
                       model === m
-                        ? 'border-violet-500/50 bg-violet-500/10 text-violet-300'
+                        ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                        : 'border-slate-700 text-slate-400 hover:border-slate-500'
+                    )}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            ) : provider === 'xai' ? (
+              <div className="flex flex-col gap-1.5">
+                {['grok-2-1212', 'grok-2-vision-1212', 'grok-3-beta', 'grok-3-mini-beta'].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setModel(m)}
+                    className={cn(
+                      'text-left px-3 py-2 rounded-lg border text-sm font-mono transition-all',
+                      model === m
+                        ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
                         : 'border-slate-700 text-slate-400 hover:border-slate-500'
                     )}
                   >
@@ -250,7 +274,7 @@ export function SettingsPage() {
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-violet-500"
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500"
               >
                 {models.map((m) => (
                   <option key={m} value={m}>{m}</option>
@@ -262,7 +286,7 @@ export function SettingsPage() {
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 placeholder="Model name (e.g. llama3.2)"
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-violet-500 font-mono placeholder-slate-600"
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500 font-mono placeholder-slate-600"
               />
             )}
           </div>

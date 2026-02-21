@@ -13,18 +13,30 @@ export async function streamOpenAICompatResponse(
 
   const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: 'system', content: systemPrompt },
-    ...messages.map((m) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })),
+    ...messages.map((m): OpenAI.Chat.ChatCompletionMessageParam => {
+      if (m.role === 'assistant') {
+        return { role: 'assistant', content: typeof m.content === 'string' ? m.content : '' }
+      }
+      return {
+        role: 'user',
+        // Cast needed: OpenAI SDK accepts image_url content parts for vision models
+        content: m.content as OpenAI.Chat.ChatCompletionUserMessageParam['content'],
+      }
+    }),
   ]
 
-  const stream = await client.chat.completions.create({
+  const baseParams: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
     model,
     messages: openaiMessages,
     max_tokens: options.maxTokens || 4096,
     stream: true,
-  })
+  }
+  // Pass `think: false` for compat providers that support it (extra field forwarded by SDK)
+  const extraParams = options.thinkingEnabled === false ? { think: false } : {}
+
+  const stream = await client.chat.completions.create(
+    { ...baseParams, ...extraParams } as OpenAI.Chat.ChatCompletionCreateParamsStreaming
+  )
 
   return new ReadableStream<string>({
     async start(controller) {

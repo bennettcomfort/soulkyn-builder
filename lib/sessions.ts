@@ -2,9 +2,14 @@ import fs from 'fs'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import type { ContentType } from './budget'
+import { TYPE_SCHEMAS } from './content-types'
+export type { TagSets } from './tag-sets'
+export { DEFAULT_TAG_SETS } from './tag-sets'
+import { DEFAULT_TAG_SETS } from './tag-sets'
+import type { TagSets } from './tag-sets'
 
 export type SessionStatus = 'in_progress' | 'complete' | 'draft'
-export type BuildMode = 'interview' | 'freeform' | 'roughdraft'
+export type BuildMode = 'interview' | 'freeform' | 'roughdraft' | 'chat'
 
 export interface Session {
   id: string
@@ -18,6 +23,8 @@ export interface Session {
   budgetUsed: number
   currentStep: number
   brainstormNotes?: string
+  tagSets: TagSets
+  chatExamples: string[]
   createdAt: string
   updatedAt: string
 }
@@ -43,10 +50,12 @@ export function createSession(
     status: 'in_progress',
     buildMode,
     interviewAnswers: {},
-    draftContent: '',
+    draftContent: TYPE_SCHEMAS[type].draftTemplate ?? '',
     finalContent: null,
     budgetUsed: 0,
     currentStep: 0,
+    tagSets: { ...DEFAULT_TAG_SETS },
+    chatExamples: ['', '', '', ''],
     createdAt: now,
     updatedAt: now,
   }
@@ -60,7 +69,12 @@ export function loadSession(id: string): Session | null {
   try {
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf-8')
-      return JSON.parse(raw) as Session
+      const parsed = JSON.parse(raw) as Session
+      // Migrate old string tagSets to structured object
+      if (typeof (parsed.tagSets as unknown) === 'string') {
+        parsed.tagSets = { ...DEFAULT_TAG_SETS }
+      }
+      return parsed
     }
   } catch {
     // ignore

@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 
-export type ProviderType = 'anthropic' | 'ollama' | 'lmstudio' | 'openai' | 'custom'
+export type ProviderType = 'anthropic' | 'ollama' | 'lmstudio' | 'openai' | 'xai' | 'custom'
 
 export interface AppSettings {
   provider: ProviderType
@@ -31,6 +31,10 @@ const DEFAULTS: Record<ProviderType, Partial<AppSettings>> = {
   openai: {
     baseUrl: 'https://api.openai.com/v1',
     model: 'gpt-4o',
+  },
+  xai: {
+    baseUrl: 'https://api.x.ai/v1',
+    model: 'grok-2-1212',
   },
   custom: {
     baseUrl: 'http://localhost:8080/v1',

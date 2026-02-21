@@ -17,9 +17,9 @@ export function Navigation() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed left-0 top-0 h-screen w-20 bg-slate-900/90 border-r border-slate-800 backdrop-blur-sm flex flex-col items-center py-5 gap-2 z-50">
+    <nav className="fixed left-0 top-0 h-screen w-20 bg-[#252526] border-r border-[#3c3c3c] flex flex-col items-center py-5 gap-2 z-50">
       {/* Logo */}
-      <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center text-white font-bold text-xl mb-4 shadow-lg shadow-violet-500/30">
+      <div className="w-12 h-12 rounded-xl bg-amber-600 flex items-center justify-center text-white font-bold text-xl mb-4 shadow-lg shadow-amber-500/30">
         S
       </div>
 
@@ -37,7 +37,7 @@ export function Navigation() {
             className={cn(
               'w-14 h-14 rounded-xl flex items-center justify-center text-2xl transition-all duration-150 group relative',
               isActive
-                ? 'bg-violet-600/20 text-violet-300 shadow shadow-violet-500/10'
+                ? 'bg-amber-600/20 text-amber-300 shadow shadow-amber-500/10'
                 : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/50'
             )}
           >

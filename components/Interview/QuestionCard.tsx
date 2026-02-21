@@ -27,6 +27,12 @@ export function QuestionCard({
   const handleOptionClick = (optionId: string) => {
     if (disabled) return
 
+    // If custom input is open, close it and proceed to select this option
+    if (showCustom) {
+      setShowCustom(false)
+      setCustomText('')
+    }
+
     if (question.multiSelect) {
       setSelected((prev) =>
         prev.includes(optionId)
@@ -96,7 +102,7 @@ export function QuestionCard({
             option={option}
             selected={selected.includes(option.id)}
             onClick={() => handleOptionClick(option.id)}
-            disabled={disabled || showCustom}
+            disabled={disabled}
           />
         ))}
 

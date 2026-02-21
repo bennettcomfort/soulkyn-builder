@@ -61,6 +61,12 @@ const MODE_OPTIONS = [
     label: 'Rough Draft',
     description: 'Paste an existing draft and the AI completes or refines it.',
   },
+  {
+    id: 'chat' as const,
+    icon: '💬',
+    label: 'Chat Build',
+    description: 'Conversational build — give instructions, the AI drafts and proposes in real time.',
+  },
 ]
 
 const COLOR_CLASSES: Record<string, string> = {
@@ -80,7 +86,7 @@ const COLOR_TEXT: Record<string, string> = {
 export function BuildSelector() {
   const router = useRouter()
   const [selectedType, setSelectedType] = useState<ContentType | null>(null)
-  const [selectedMode, setSelectedMode] = useState<'interview' | 'freeform' | 'roughdraft'>('interview')
+  const [selectedMode, setSelectedMode] = useState<'interview' | 'freeform' | 'roughdraft' | 'chat'>('interview')
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
 
@@ -146,7 +152,7 @@ export function BuildSelector() {
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
             2. Creation Mode
           </h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {MODE_OPTIONS.map((mode) => (
               <button
                 key={mode.id}
@@ -154,12 +160,12 @@ export function BuildSelector() {
                 className={cn(
                   'text-left p-4 rounded-xl border transition-all duration-150',
                   selectedMode === mode.id
-                    ? 'border-violet-500/50 bg-violet-500/10'
+                    ? 'border-amber-500/50 bg-amber-500/10'
                     : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600/50'
                 )}
               >
                 <div className="text-xl mb-2">{mode.icon}</div>
-                <div className={cn('font-medium text-sm mb-1', selectedMode === mode.id ? 'text-violet-300' : 'text-slate-200')}>
+                <div className={cn('font-medium text-sm mb-1', selectedMode === mode.id ? 'text-amber-300' : 'text-slate-200')}>
                   {mode.label}
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">{mode.description}</p>
@@ -181,7 +187,7 @@ export function BuildSelector() {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             placeholder="e.g. NetPunk City 2, Shadow Court RPG..."
-            className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors text-sm"
+            className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors text-sm"
             autoFocus
           />
         </section>
@@ -195,7 +201,7 @@ export function BuildSelector() {
           size="lg"
           className="w-full"
         >
-          {creating ? 'Creating...' : `Create ${selectedType} → ${selectedMode === 'interview' ? 'Start Interview' : selectedMode === 'freeform' ? 'Generate' : 'Paste Draft'}`}
+          {creating ? 'Creating...' : `Create ${selectedType} → ${selectedMode === 'interview' ? 'Start Interview' : selectedMode === 'freeform' ? 'Generate' : selectedMode === 'roughdraft' ? 'Paste Draft' : 'Chat Build'}`}
         </Button>
       )}
     </div>

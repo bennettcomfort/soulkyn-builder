@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
       useCreatorSystem?: boolean
       enableWebSearch?: boolean
       maxTokens?: number
+      thinkingEnabled?: boolean
     }
 
     let systemPrompt = body.systemPrompt || ''
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
     const stream = await streamResponse(messages, systemPrompt, {
       maxTokens: body.maxTokens || 8192,
       enableWebSearch: body.enableWebSearch,
+      thinkingEnabled: body.thinkingEnabled,
     })
 
     const encoder = new TextEncoder()

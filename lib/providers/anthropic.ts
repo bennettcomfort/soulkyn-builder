@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { AIMessage, AIStreamOptions } from '../ai'
+import type { AIMessage, AIContentPart, AIStreamOptions } from '../ai'
 
 let client: Anthropic | null = null
 
@@ -8,6 +8,30 @@ function getClient(apiKey: string): Anthropic {
     client = new Anthropic({ apiKey })
   }
   return client
+}
+
+function toAnthropicContent(
+  content: string | AIContentPart[]
+): Anthropic.Messages.ContentBlockParam[] {
+  if (typeof content === 'string') {
+    return [{ type: 'text', text: content }]
+  }
+  return content.map((part): Anthropic.Messages.ContentBlockParam => {
+    if (part.type === 'text') {
+      return { type: 'text', text: part.text }
+    }
+    // image_url format: data:<media_type>;base64,<data>
+    const match = part.image_url.url.match(/^data:(image\/[^;]+);base64,(.+)$/)
+    if (!match) throw new Error('Invalid image data URL')
+    return {
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: match[1] as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+        data: match[2],
+      },
+    }
+  })
 }
 
 export async function streamAnthropicResponse(
@@ -21,7 +45,7 @@ export async function streamAnthropicResponse(
 
   const anthropicMessages = messages.map((m) => ({
     role: m.role as 'user' | 'assistant',
-    content: m.content,
+    content: toAnthropicContent(m.content),
   }))
 
   const stream = anthropic.messages.stream({
