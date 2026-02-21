@@ -64,6 +64,7 @@ import type { TagSets } from '@/lib/tag-sets'
 import { DEFAULT_TAG_SETS } from '@/lib/tag-sets'
 import type { ContentType } from '@/lib/budget'
 import type { SectionGuideItem } from '@/lib/content-types'
+import { generateExportMarkdown, exportFilename } from '@/lib/export'
 
 interface ChatBuildSessionProps {
   session: Session
@@ -547,6 +548,23 @@ No preamble, no commentary — output only the section block starting with [Impo
     }
   }
 
+  const handleExport = () => {
+    const md = generateExportMarkdown({
+      name: session.name,
+      draftContent,
+      finalContent: session.finalContent ?? null,
+      tagSets,
+      chatExamples,
+    })
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = exportFilename(session.name)
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
@@ -567,12 +585,20 @@ No preamble, no commentary — output only the section block starting with [Impo
           </Button>
         )}
         {draftContent && (
-          <button
-            onClick={() => navigator.clipboard.writeText(draftContent)}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-          >
-            Copy Draft
-          </button>
+          <>
+            <button
+              onClick={() => navigator.clipboard.writeText(draftContent)}
+              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Copy Draft
+            </button>
+            <button
+              onClick={handleExport}
+              className="text-xs text-amber-500/70 hover:text-amber-300 transition-colors"
+            >
+              Export .md
+            </button>
+          </>
         )}
       </header>
 
