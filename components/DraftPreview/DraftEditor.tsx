@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useRef, useEffect, useState, useImperativeHandle, forwardRef } from 'react'
+import React, { useMemo, useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import type { ContentType } from '@/lib/budget'
 import type { TagSets } from '@/lib/tag-sets'
@@ -290,7 +290,49 @@ export const DraftEditor = forwardRef<DraftEditorHandle, DraftEditorProps>(funct
 }, ref) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
+  const ghostRef = useRef<HTMLDivElement>(null)
   const [suppOpen, setSuppOpen] = useState(false)
+
+  // ── Ghost text (Copilot autocomplete) ──────────────────────────────────────
+  const [suggestion, setSuggestion] = useState('')
+  const [cursorOffset, setCursorOffset] = useState(0)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const fetchSuggestion = useCallback(async (text: string, cursor: number) => {
+    const prefix = text.slice(0, cursor)
+    if (prefix.trim().length < 10) { setSuggestion(''); return }
+
+    abortRef.current?.abort()
+    const ac = new AbortController()
+    abortRef.current = ac
+
+    try {
+      const res = await fetch('/api/autocomplete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefix }),
+        signal: ac.signal,
+      })
+      if (!res.ok) return
+      const data = await res.json() as { suggestion?: string }
+      if (!ac.signal.aborted) setSuggestion(data.suggestion ?? '')
+    } catch {
+      // aborted or network error — ignore
+    }
+  }, [])
+
+  const scheduleSuggestion = useCallback((text: string, cursor: number) => {
+    setSuggestion('')
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => fetchSuggestion(text, cursor), 500)
+  }, [fetchSuggestion])
+
+  // Dismiss suggestion on unmount
+  useEffect(() => () => {
+    debounceRef.current && clearTimeout(debounceRef.current)
+    abortRef.current?.abort()
+  }, [])
 
   useImperativeHandle(ref, () => ({
     scrollToSection(term: string) {
@@ -344,6 +386,9 @@ export const DraftEditor = forwardRef<DraftEditorHandle, DraftEditorProps>(funct
     if (highlightRef.current && textareaRef.current) {
       highlightRef.current.scrollTop = textareaRef.current.scrollTop
     }
+    if (ghostRef.current && textareaRef.current) {
+      ghostRef.current.scrollTop = textareaRef.current.scrollTop
+    }
   }
 
   const showCommentBar = comments.length > 0 && !isStreaming
@@ -360,10 +405,57 @@ export const DraftEditor = forwardRef<DraftEditorHandle, DraftEditorProps>(funct
           style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#d4d4d4' }}
           dangerouslySetInnerHTML={{ __html: highlighted + '\n' }}
         />
+
+        {/* Ghost text overlay */}
+        {suggestion && !isStreaming && (
+          <div
+            ref={ghostRef}
+            aria-hidden
+            className="absolute inset-0 p-4 font-mono text-sm leading-relaxed pointer-events-none overflow-hidden"
+            style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+          >
+            {/* Invisible prefix to push ghost text to correct position */}
+            <span style={{ color: 'transparent' }}>{content.slice(0, cursorOffset)}</span>
+            {/* The suggestion in faded color */}
+            <span style={{ color: '#6b7280', opacity: 0.8 }}>{suggestion}</span>
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           value={content}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            onChange(e.target.value)
+            const cursor = e.target.selectionStart ?? e.target.value.length
+            setCursorOffset(cursor)
+            if (!isStreaming) scheduleSuggestion(e.target.value, cursor)
+            else setSuggestion('')
+          }}
+          onKeyDown={(e) => {
+            if (suggestion && e.key === 'Tab') {
+              e.preventDefault()
+              const ta = e.currentTarget
+              const before = content.slice(0, cursorOffset)
+              const after = content.slice(cursorOffset)
+              const next = before + suggestion + after
+              onChange(next)
+              setSuggestion('')
+              // Move cursor to end of accepted suggestion
+              const newPos = cursorOffset + suggestion.length
+              requestAnimationFrame(() => {
+                ta.setSelectionRange(newPos, newPos)
+                setCursorOffset(newPos)
+              })
+            } else if (suggestion && e.key === 'Escape') {
+              e.preventDefault()
+              setSuggestion('')
+            } else if (suggestion) {
+              setSuggestion('')
+            }
+          }}
+          onClick={(e) => {
+            const cursor = e.currentTarget.selectionStart ?? 0
+            setCursorOffset(cursor)
+          }}
           onScroll={syncScroll}
           readOnly={isStreaming}
           className={cn(
@@ -386,6 +478,16 @@ export const DraftEditor = forwardRef<DraftEditorHandle, DraftEditorProps>(funct
         {isStreaming && (
           <div className="absolute bottom-2 left-4 pointer-events-none">
             <span className="inline-block w-2 h-4 bg-amber-400 animate-pulse align-middle" />
+          </div>
+        )}
+
+        {suggestion && !isStreaming && (
+          <div className="absolute bottom-2 right-3 pointer-events-none flex items-center gap-1.5">
+            <span className="text-[10px] text-slate-500">Copilot</span>
+            <kbd className="text-[10px] text-slate-400 bg-slate-700/60 border border-slate-600/50 rounded px-1 py-0.5 leading-none">Tab</kbd>
+            <span className="text-[10px] text-slate-500">to accept</span>
+            <kbd className="text-[10px] text-slate-500 bg-slate-700/40 border border-slate-600/30 rounded px-1 py-0.5 leading-none">Esc</kbd>
+            <span className="text-[10px] text-slate-500">to dismiss</span>
           </div>
         )}
       </div>

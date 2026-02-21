@@ -7,10 +7,10 @@ export const runtime = 'nodejs'
 
 export async function GET() {
   const settings = loadSettings()
-  // Mask API key in response
   return NextResponse.json({
     ...settings,
     apiKey: settings.apiKey ? '***' + settings.apiKey.slice(-4) : '',
+    copilotToken: settings.copilotToken ? '***' + settings.copilotToken.slice(-4) : '',
   })
 }
 
@@ -18,16 +18,22 @@ export async function PUT(req: NextRequest) {
   const body = await req.json() as Partial<AppSettings>
   const current = loadSettings()
 
-  // Don't overwrite key if masked value sent back
+  // Don't overwrite keys if masked values sent back
   const apiKey =
     body.apiKey && body.apiKey.startsWith('***')
       ? current.apiKey
       : (body.apiKey ?? current.apiKey)
 
+  const copilotToken =
+    body.copilotToken && body.copilotToken.startsWith('***')
+      ? current.copilotToken
+      : (body.copilotToken ?? current.copilotToken)
+
   const updated: AppSettings = {
     ...current,
     ...body,
     apiKey,
+    copilotToken,
   }
 
   saveSettings(updated)

@@ -13,6 +13,7 @@ const PROVIDER_LABELS: Record<ProviderType, string> = {
   lmstudio: 'LM Studio (local)',
   openai: 'OpenAI',
   xai: 'xAI (Grok)',
+  copilot: 'GitHub Copilot',
   custom: 'Custom OpenAI-compatible',
 }
 
@@ -42,6 +43,11 @@ const PROVIDER_DEFAULTS: Record<ProviderType, { baseUrl: string; placeholder: st
     placeholder: 'xai-...',
     needsKey: true,
   },
+  copilot: {
+    baseUrl: 'https://api.githubcopilot.com',
+    placeholder: 'GitHub OAuth token — run: gh auth token',
+    needsKey: true,
+  },
   custom: {
     baseUrl: 'http://localhost:8080/v1',
     placeholder: 'API key (if required)',
@@ -55,8 +61,11 @@ const PROVIDER_CAPABILITIES: Record<ProviderType, string[]> = {
   lmstudio: ['Streaming', 'Tools (model-dependent)'],
   openai: ['Vision (GPT-4o)', 'Tools', 'Streaming'],
   xai: ['Streaming', 'Tools', 'Vision (grok-2-vision)'],
+  copilot: ['Streaming', 'Tools', 'Vision (gpt-4o)', 'Draft Autocomplete'],
   custom: ['Streaming', 'Tools (provider-dependent)'],
 }
+
+const COPILOT_MODELS = ['gpt-4o', 'gpt-4o-mini', 'claude-3.5-sonnet', 'o3-mini']
 
 export function SettingsPage() {
   const [provider, setProvider] = useState<ProviderType>('anthropic')
@@ -69,6 +78,7 @@ export function SettingsPage() {
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [copilotToken, setCopilotToken] = useState('')
 
   // Load current settings
   useEffect(() => {
@@ -79,6 +89,7 @@ export function SettingsPage() {
         setBaseUrl(data.baseUrl || '')
         setApiKey(data.apiKey || '')
         setModel(data.model || '')
+        setCopilotToken(data.copilotToken || '')
       })
       .catch(() => {})
   }, [])
@@ -134,7 +145,7 @@ export function SettingsPage() {
       await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, baseUrl, apiKey, model }),
+        body: JSON.stringify({ provider, baseUrl, apiKey, model, copilotToken }),
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -225,7 +236,7 @@ export function SettingsPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-sm font-medium text-slate-300">Model</label>
-              {provider !== 'anthropic' && provider !== 'xai' && (
+              {provider !== 'anthropic' && provider !== 'xai' && provider !== 'copilot' && (
                 <button
                   onClick={fetchModels}
                   disabled={fetchingModels}
@@ -270,6 +281,23 @@ export function SettingsPage() {
                   </button>
                 ))}
               </div>
+            ) : provider === 'copilot' ? (
+              <div className="flex flex-col gap-1.5">
+                {COPILOT_MODELS.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setModel(m)}
+                    className={cn(
+                      'text-left px-3 py-2 rounded-lg border text-sm font-mono transition-all',
+                      model === m
+                        ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                        : 'border-slate-700 text-slate-400 hover:border-slate-500'
+                    )}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
             ) : models.length > 0 ? (
               <select
                 value={model}
@@ -289,6 +317,32 @@ export function SettingsPage() {
                 className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500 font-mono placeholder-slate-600"
               />
             )}
+          </div>
+        </Card>
+      </section>
+
+      {/* Copilot Autocomplete */}
+      <section className="mb-6">
+        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-1">
+          Copilot Draft Autocomplete
+        </h2>
+        <p className="text-xs text-slate-500 mb-3">
+          Ghost-text completions in the draft editor. Always uses GitHub Copilot regardless of main provider.
+          Get your token by running <code className="text-amber-400 bg-slate-800 px-1 rounded">gh auth token</code> in your terminal.
+        </p>
+        <Card className="p-5">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">GitHub OAuth Token</label>
+            <input
+              type="password"
+              value={copilotToken}
+              onChange={(e) => setCopilotToken(e.target.value)}
+              placeholder="gho_... (run: gh auth token)"
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500 font-mono placeholder-slate-600"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              Stored locally in data/settings.json. Leave blank to disable autocomplete.
+            </p>
           </div>
         </Card>
       </section>

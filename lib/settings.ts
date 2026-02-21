@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 
-export type ProviderType = 'anthropic' | 'ollama' | 'lmstudio' | 'openai' | 'xai' | 'custom'
+export type ProviderType = 'anthropic' | 'ollama' | 'lmstudio' | 'openai' | 'xai' | 'copilot' | 'custom'
 
 export interface AppSettings {
   provider: ProviderType
@@ -9,6 +9,8 @@ export interface AppSettings {
   apiKey: string
   model: string
   customProviderName?: string
+  /** GitHub OAuth token used for Copilot autocomplete in the draft editor (independent of main provider) */
+  copilotToken?: string
 }
 
 const SETTINGS_PATH = path.join(process.cwd(), 'data', 'settings.json')
@@ -35,6 +37,10 @@ const DEFAULTS: Record<ProviderType, Partial<AppSettings>> = {
   xai: {
     baseUrl: 'https://api.x.ai/v1',
     model: 'grok-2-1212',
+  },
+  copilot: {
+    baseUrl: 'https://api.githubcopilot.com',
+    model: 'gpt-4o',
   },
   custom: {
     baseUrl: 'http://localhost:8080/v1',
