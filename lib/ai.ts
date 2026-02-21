@@ -62,7 +62,7 @@ export async function streamResponse(
     )
   }
 
-  // All other OpenAI-compat providers (lmstudio, openai, custom)
+  // All other OpenAI-compat providers (lmstudio, openai, copilot, custom)
   return streamOpenAICompatResponse(
     messages,
     systemPrompt,
@@ -80,6 +80,10 @@ export async function listModels(): Promise<string[]> {
     return listAnthropicModels()
   }
 
+  if (settings.provider === 'copilot') {
+    return ['gpt-4o', 'gpt-4o-mini', 'claude-3.5-sonnet', 'o3-mini']
+  }
+
   return listOpenAICompatModels(settings.baseUrl, settings.apiKey)
 }
 
@@ -94,7 +98,8 @@ export async function testConnection(): Promise<{ ok: boolean; error?: string }>
     }
 
     const models = await listModels()
-    if (models.length === 0 && settings.provider !== 'anthropic') {
+    const noModelCheckNeeded = settings.provider === 'anthropic' || settings.provider === 'copilot'
+    if (models.length === 0 && !noModelCheckNeeded) {
       return { ok: false, error: 'Could not retrieve model list — is the server running?' }
     }
 
